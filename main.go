@@ -12,6 +12,15 @@ import (
 	"strings"
 )
 
+/**		usage:
+ *			Json2Go [file]
+ *          Json2Go [file] [target]
+ *          Json2Go:
+ *              -src	:	source file
+ *				-dest	:	dest file
+ *				-f		:	overwrite dest file. Default true
+ *				-name	:	The name of the go struct
+ */
 var (
 	srcFlag    = flag.String("src", "", "The src file to be converted")
 	targetFlag = flag.String("dest", "", "The position of the generated file")
@@ -29,36 +38,57 @@ var (
 	structBuffer bytes.Buffer
 )
 
-func main() {
+func handleInput() {
 	flag.Parse()
-	// fmt.Print(*srcFlag, *targetFlag, *forceFlag)
 	if len(os.Args) < 2 {
 		flag.Usage()
-		return
-	}
-	if *srcFlag == "" {
-		*srcFlag = os.Args[1]
-	}
-	if *targetFlag == "" {
-		*targetFlag = "./"
+		os.Exit(0)
 	}
 
-	bts, err := ioutil.ReadFile(path.Join(".", *srcFlag))
+	if _inputNoFlag() {
+		*srcFlag = os.Args[1]
+		if len(os.Args) > 2 {
+			*targetFlag = os.Args[2]
+		}
+	}
+
+	if *targetFlag == "" {
+		*targetFlag = "./JsonObjcet.go"
+	}
+
+	_, err := os.Stat(*targetFlag)
+	if err != nil && !*forceFlag {
+		fmt.Println("文件JsonObject.go已经存在")
+		os.Exit(0)
+	}
+
+	_, err = os.Stat(*srcFlag)
 	if err != nil {
 		fmt.Println(err)
-		flag.Usage()
-		return
+		fmt.Printf("File %s not exist\n", *srcFlag)
+		os.Exit(0)
 	}
-	// fmt.Println(string(bts[:]))
+}
+
+func _inputNoFlag() bool {
+	return *srcFlag == "" &&
+		*targetFlag == "" &&
+		*nameFlag == "JsonObject"
+}
+
+func handleFileParse() {
+	bts, _ := ioutil.ReadFile(path.Join(".", *srcFlag))
 	jsonStr := string(bts[:])
 	m, ok := gjson.Parse(jsonStr).Value().(map[string]interface{})
 	if !ok {
 		fmt.Println("json file parse error , please check the file format")
-		return
+		os.Exit(0)
 	}
 
 	taskList = append(taskList, Task{*nameFlag, m})
+}
 
+func handleGoGenerate() {
 	for {
 		if len(taskList) == 0 {
 			break
@@ -68,8 +98,7 @@ func main() {
 		HandleTask(task)
 	}
 
-	// fmt.Println(structBuffer.String())
-	file, err := os.Create(*nameFlag + ".go")
+	file, err := os.Create(*targetFlag)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -92,7 +121,6 @@ func HandleTask(task Task) {
 	}()
 	for key, val := range task.content {
 		line, err := getStructLineString(key, val, task)
-		// fmt.Println(line)
 		if err != nil {
 			panic(err)
 		}
@@ -131,8 +159,9 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 		if len(mps) == 0 {
 			break
 		}
-		mp, _ := mps[0].(map[string]interface{})
-		taskList = append(taskList, Task{name, mp})
+		unionMap := getUnionFieldMap(mps)
+		// mp, _ := mps[0].(map[string]interface{})
+		taskList = append(taskList, Task{name, unionMap})
 		// taskList = append(taskList, Task{name, mps[0]})
 	case reflect.Map:
 		typeStr = key + "Item"
@@ -154,10 +183,26 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 
 }
 
-// func map2Struct(m map[string]interface{}) string {
-// 	var buffer bytes.Buffer
-// 	for key, val := range m {
+func getUnionFieldMap(mps []interface{}) (unionMap map[string]interface{}) {
+	unionMap = make(map[string]interface{})
+	for _, v := range mps {
+		v, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for key, field := range v {
+			if _, ok := unionMap[key]; ok {
+				continue
+			}
+			unionMap[key] = field
+		}
 
-// 	}
-// 	return
-// }
+	}
+	return
+}
+
+func main() {
+	handleInput()
+	handleFileParse()
+	handleGoGenerate()
+}
