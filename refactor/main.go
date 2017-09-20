@@ -7,27 +7,13 @@ import (
 	"github.com/tidwall/gjson"
 	"io/ioutil"
 	"os"
-	"path"
 	"reflect"
 	"strings"
 )
 
-/**		usage:
- *			Json2Go [file]
- *          Json2Go [file] [target]
- *          Json2Go:
- *              -src	:	source file
- *				-dest	:	dest file
- *				-f		:	overwrite dest file. Default true
- *				-name	:	The name of the go struct
- */
 var (
-	srcFlag       = flag.String("src", "", "The src file to be converted")
-	targetFlag    = flag.String("dest", "", "The position of the generated file")
-	forceFlag     = flag.Bool("f", true, "wheather to force overwrite the target file")
-	nameFlag      = flag.String("name", "JsonObject", "the struct name of the json object")
-	consoleFlag   = flag.Bool("c", false, "whether to print outpu to the terminal. Append to the end when use simplified format")
 	recursiveFlag = flag.Bool("r", false, "if r is set , output struct will be in closure format. Append to the end when use simplified format")
+	jsonContent   = ""
 )
 
 type Task struct {
@@ -36,95 +22,76 @@ type Task struct {
 }
 
 var (
-	taskList     []Task = make([]Task, 0)
-	structBuffer bytes.Buffer
+	taskList []Task = make([]Task, 0)
 )
 
-func handleInput() {
+func main() {
+	parseArgs()
+	handleParse()
+	handleGoGenerate()
+}
+
+func parseArgs() {
 	flag.Parse()
-	if len(os.Args) < 2 {
+
+	hasChannel := false
+	info, _ := os.Stdin.Stat()
+	if info.Size() > 0 {
+		hasChannel = true
+		bts, _ := ioutil.ReadAll(os.Stdin)
+		jsonContent = string(bts[:])
+	}
+
+	if len(os.Args) < 2 && !hasChannel {
 		flag.Usage()
 		os.Exit(0)
 	}
-
-	if _inputNoFlag() {
-		*srcFlag = os.Args[1]
-		if len(os.Args) > 2 && os.Args[2] != "-c" {
-			*targetFlag = os.Args[2]
+	if !hasChannel {
+		if !*recursiveFlag {
+			jsonContent = os.Args[1]
+		} else {
+			if len(os.Args) < 3 && !hasChannel {
+				flag.Usage()
+				os.Exit(0)
+			}
+			jsonContent = os.Args[2]
 		}
 	}
 
-	if *targetFlag == "" {
-		*targetFlag = "./JsonObjcet.go"
-	}
-
-	_, err := os.Stat(*targetFlag)
-	if err != nil && !*forceFlag {
-		fmt.Println("文件JsonObject.go已经存在")
-		os.Exit(0)
-	}
-
-	_, err = os.Stat(*srcFlag)
-	if err != nil {
-		fmt.Println(err)
-		fmt.Printf("File %s not exist\n", *srcFlag)
-		os.Exit(0)
-	}
 }
 
-func _inputNoFlag() bool {
-	return *srcFlag == "" &&
-		*targetFlag == "" &&
-		*nameFlag == "JsonObject"
-}
-
-func handleFileParse() {
-	bts, _ := ioutil.ReadFile(path.Join(".", *srcFlag))
-	jsonStr := string(bts[:])
-	m, ok := gjson.Parse(jsonStr).Value().(map[string]interface{})
+func handleParse() {
+	m, ok := gjson.Parse(jsonContent).Value().(map[string]interface{})
 	if !ok {
 		fmt.Println("json file parse error , please check the file format")
 		os.Exit(0)
 	}
 
-	taskList = append(taskList, Task{*nameFlag, m})
+	taskList = append(taskList, Task{"JsonObject", m})
 }
 
 func handleGoGenerate() {
+	var structBuffer bytes.Buffer
 	for {
 		if len(taskList) == 0 {
 			break
 		}
 		task := taskList[0]
 		taskList = taskList[1:]
-		HandleTask(task)
-	}
-	fmt.Println(*consoleFlag)
-	if *consoleFlag {
-		fmt.Println(structBuffer.String())
-		return
+		content, _ := HandleTask(task)
+		structBuffer.WriteString(content)
 	}
 	fmt.Println(structBuffer.String())
-	file, err := os.Create(*targetFlag)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer file.Close()
-	_, err = file.WriteString(structBuffer.String())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	return
 }
 
-func HandleTask(task Task) {
-	var buffer bytes.Buffer
+func HandleTask(task Task) (res string, err error) {
+	buffer := bytes.Buffer{}
 	buffer.WriteString(fmt.Sprintf(`type %s struct {
 `, task.name))
 	defer func() {
 		buffer.WriteString("}\n")
-		structBuffer.WriteString(string(buffer.String()))
+		res = buffer.String()
 	}()
 	for key, val := range task.content {
 		line, err := getStructLineString(key, val, task)
@@ -133,6 +100,7 @@ func HandleTask(task Task) {
 		}
 		buffer.WriteString(line)
 	}
+	return buffer.String(), nil
 }
 
 func getStructLineString(key string, val interface{}, task Task) (line string, err error) {
@@ -142,6 +110,39 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 	key = strings.ToUpper(key[0:1]) + key[1:]
 	lineBuffer.WriteString(fmt.Sprintf("\t%s\t", key))
 	tp := reflect.TypeOf(val)
+
+	//recursive handle function
+	type TaskType string
+	const (
+		TaskSlice TaskType = "slice"
+		TaskMap   TaskType = "map"
+	)
+	handleRecursiveTask := func(task Task, tp TaskType) (res string, err error) {
+		bf := bytes.Buffer{}
+		bf.WriteString(fmt.Sprintf("\t%s\t", key))
+		switch tp {
+		case TaskSlice:
+			bf.WriteString("[]struct{\n")
+		case TaskMap:
+			bf.WriteString("struct{\n")
+		default:
+			panic("wrong task type ")
+		}
+		defer func() {
+			bf.WriteString("\t}\t")
+			bf.WriteString(fmt.Sprintf("`json:\"%s\"`\n", oldKey))
+			res = bf.String()
+		}()
+		for key, val := range task.content {
+			line, err := getStructLineString(key, val, task)
+			if err != nil {
+				panic(err)
+			}
+			bf.WriteString("\t" + line)
+		}
+
+		return bf.String(), nil
+	}
 
 	// write type
 	var typeStr string
@@ -167,16 +168,25 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 			break
 		}
 		unionMap := getUnionFieldMap(mps)
-		// mp, _ := mps[0].(map[string]interface{})
-		taskList = append(taskList, Task{name, unionMap})
-		// taskList = append(taskList, Task{name, mps[0]})
+
+		if *recursiveFlag {
+			return handleRecursiveTask(Task{name, unionMap}, TaskSlice)
+		} else {
+			taskList = append(taskList, Task{name, unionMap})
+		}
+
 	case reflect.Map:
 		typeStr = key + "Item"
 		mp, ok := task.content[oldKey].(map[string]interface{})
 		if !ok {
 			return "", fmt.Errorf("wrong value type : %s ", val)
 		}
-		taskList = append(taskList, Task{typeStr, mp})
+		if *recursiveFlag {
+			return handleRecursiveTask(Task{typeStr, mp}, TaskMap)
+		} else {
+			taskList = append(taskList, Task{typeStr, mp})
+		}
+
 	default:
 		return "", fmt.Errorf("wrong value type : %s ", val)
 	}
@@ -206,10 +216,4 @@ func getUnionFieldMap(mps []interface{}) (unionMap map[string]interface{}) {
 
 	}
 	return
-}
-
-func main() {
-	handleInput()
-	handleFileParse()
-	handleGoGenerate()
 }

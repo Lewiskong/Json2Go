@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+
+<Root>
+
+<Descriptor tde_value_type="text" >
+
+  <KeyConf>
+    <Item name="ip"/>
+  </KeyConf>
+
+  <Message desc="IpInfo" item_split_flag=",">
+    <Item name="isp" is_used="false" />
+    <Item name="country" />
+    <Item name="province" />
+    <Item name="city" />
+  </Message>
+
+</Descriptor>
+
+
+</Root>

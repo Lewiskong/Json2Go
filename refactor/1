@@ -1,0 +1,18 @@
+type JsonObject struct {
+	Result	bool	`json:"result"`
+	Orders	[]OrdersItem	`json:"orders"`
+}
+type OrdersItem struct {
+	Type	string	`json:"type"`
+	Amount	float64	`json:"amount"`
+	Avg_price	float64	`json:"avg_price"`
+	Orders_id	float64	`json:"orders_id"`
+	Order_id	float64	`json:"order_id"`
+	Status	float64	`json:"status"`
+	Deal_amount	float64	`json:"deal_amount"`
+	Create_date	float64	`json:"create_date"`
+	Price	float64	`json:"price"`
+	Symbol	string	`json:"symbol"`
+	Fuck	string	`json:"fuck"`
+}
+
