@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/tidwall/gjson"
 )
 
 var (
@@ -107,8 +108,24 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 	// write variable name
 	oldKey := key
 	var lineBuffer bytes.Buffer
-	key = strings.ToUpper(key[0:1]) + key[1:]
+
+	switch len(key) {
+	case 0:
+		return "", nil
+	case 1:
+		key = strings.ToUpper(key)
+	default:
+		key = strings.ToUpper(key[0:1]) + key[1:]
+
+	}
+
 	lineBuffer.WriteString(fmt.Sprintf("\t%s\t", key))
+
+	// handle json value `null`
+	if val == nil {
+		val = struct{}{}
+	}
+
 	tp := reflect.TypeOf(val)
 
 	//recursive handle function
@@ -146,6 +163,7 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 
 	// write type
 	var typeStr string
+
 	switch tp.Kind() {
 	case reflect.Bool:
 		typeStr = "bool"
@@ -157,6 +175,8 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 		typeStr = "float32"
 	case reflect.Float64:
 		typeStr = "float64"
+	case reflect.Struct:
+		typeStr = "interface{}"
 	case reflect.Slice:
 		name := key + "Item"
 		typeStr = fmt.Sprintf("[]" + name)

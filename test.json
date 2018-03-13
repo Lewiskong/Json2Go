@@ -1,30 +1,62 @@
 {
-    "result": true,
-    "orders": [
-        {
-            "amount": 0.1,
-            "avg_price": 0,
-            "create_date": 1418008467000,
-            "deal_amount": 0,
-            "order_id": 10000591,
-            "orders_id": 10000591,
-            "price": 500,
-            "status": 0,
-            "symbol": "btc_cny",
-            "type": "sell"
+    "code": 0,
+    "msg": {
+        "info": {
+            "offerid": "1450013063",
+            "wxMcid": "1000018901",
+            "qqMcid": "1000023401",
+            "name": "\u9f0e\u7ea7\u5267\u573a\uff08QQ\u7528\u6237\uff09_html5"
         },
-        {
-            "amount": 0.2,
-            "avg_price": 0,
-            "create_date": 1417417957000,
-            "deal_amount": 0,
-            "order_id": 10000724,
-            "orders_id": 10000724,
-            "price": 0.1,
-            "status": 0,
-            "symbol": "btc_cny",
-            "type": "buy",
-            "fuck" : "what"
-        }
-    ]
+        "month": [{
+            "FOfferID": "1450013063",
+            "FServiceCode": "GDDJCQQ",
+            "FChannel": "default",
+            "FSubChannel": "default",
+            "FProductID": "31_10",
+            "FProductName": "1\u4e2a\u6708",
+            "FInnerProductID": "GDDJCQQ",
+            "FCurrencyAmt": "1000",
+            "FCurrencyType": "CNY",
+            "FCurrencyUnit": "3",
+            "FProductIDOpenDays": "31",
+            "FUnitPriceOpenDays": "31",
+            "FTimeStamp": "2017-08-31 15:42:13",
+            "FChildrenProductId": "",
+            "FMaxOpenDays": "99999",
+            "FProductType": "",
+            "FAutoPayProductID": "",
+            "FProductShortName": "1\u4e2a\u6708",
+            "FOpenTimeUnit": "day",
+            "FOpenDaysCheckFlag": "1",
+            "FStatus": "1",
+            "FFreeTrailDays": "0",
+            "FProductTag": "",
+            "FProductDesc": null
+        },{
+            "FOfferID": "1450013063",
+            "FServiceCode": "GDDJCQQ",
+            "FChannel": "default",
+            "FSubChannel": "default",
+            "FProductID": "372_258",
+            "FProductName": "12\u4e2a\u6708",
+            "FInnerProductID": "GDDJCQQ",
+            "FCurrencyAmt": "9900",
+            "FCurrencyType": "CNY",
+            "FCurrencyUnit": "3",
+            "FProductIDOpenDays": "372",
+            "FUnitPriceOpenDays": "372",
+            "FTimeStamp": "2017-08-31 15:42:13",
+            "FChildrenProductId": "",
+            "FMaxOpenDays": "99999",
+            "FProductType": "",
+            "FAutoPayProductID": "",
+            "FProductShortName": "12\u4e2a\u6708",
+            "FOpenTimeUnit": "day",
+            "FOpenDaysCheckFlag": "1",
+            "FStatus": "1",
+            "FFreeTrailDays": "0",
+            "FProductTag": "",
+            "FProductDesc": null
+        }]
+    }
 }
