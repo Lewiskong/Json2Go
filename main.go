@@ -97,7 +97,7 @@ func HandleTask(task Task) (res string, err error) {
 	for key, val := range task.content {
 		line, err := getStructLineString(key, val, task)
 		if err != nil {
-			panic(err)
+			panic(err.Error())
 		}
 		buffer.WriteString(line)
 	}
@@ -120,13 +120,16 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 	}
 
 	lineBuffer.WriteString(fmt.Sprintf("\t%s\t", key))
-
 	// handle json value `null`
 	if val == nil {
 		val = struct{}{}
 	}
 
-	tp := reflect.TypeOf(val)
+	var (
+		tp         = reflect.TypeOf(val)
+		typeStr    string
+		parseValue = task.content[oldKey]
+	)
 
 	//recursive handle function
 	type TaskType string
@@ -134,6 +137,7 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 		TaskSlice TaskType = "slice"
 		TaskMap   TaskType = "map"
 	)
+
 	handleRecursiveTask := func(task Task, tp TaskType) (res string, err error) {
 		bf := bytes.Buffer{}
 		bf.WriteString(fmt.Sprintf("\t%s\t", key))
@@ -161,43 +165,65 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 		return bf.String(), nil
 	}
 
-	// write type
-	var typeStr string
-
-	switch tp.Kind() {
-	case reflect.Bool:
-		typeStr = "bool"
-	case reflect.String:
-		typeStr = "string"
-	case reflect.Int:
-		typeStr = "int"
-	case reflect.Float32:
-		typeStr = "float32"
-	case reflect.Float64:
-		typeStr = "float64"
-	case reflect.Struct:
-		typeStr = "interface{}"
-	case reflect.Slice:
-		name := key + "Item"
-		typeStr = fmt.Sprintf("[]" + name)
-		mps, ok := task.content[oldKey].([]interface{})
+	for tp.Kind() == reflect.Slice {
+		mps, ok := parseValue.([]interface{})
 		if !ok {
 			return "", fmt.Errorf("wrong value type : %s ", val)
 		}
 		if len(mps) == 0 {
 			break
 		}
-		unionMap := getUnionFieldMap(mps)
+		// 判断[]内类型是否相同，不相同则为[]interface{}
+		baseType := reflect.TypeOf(mps[0])
+		isStandardArray := true
+		for _, mp := range mps {
+			if reflect.TypeOf(mp) != baseType {
+				isStandardArray = false
+				break
+			}
+		}
+		// 数组内类型不一样，go文件中生成[]interface{}
+		typeStr += "[]"
+		if !isStandardArray {
+			tp = reflect.TypeOf(struct{}{})
+		} else if baseType.Kind() == reflect.Slice {
+			parseValue = mps[0]
+			continue
+		} else if baseType.Kind() == reflect.Map {
+			name := key + "Item"
+			typeStr += name
 
-		if *recursiveFlag {
-			return handleRecursiveTask(Task{name, unionMap}, TaskSlice)
-		} else {
+			unionMap := getUnionFieldMap(mps)
+			if *recursiveFlag {
+				return handleRecursiveTask(Task{name, unionMap}, TaskSlice)
+			}
+
 			taskList = append(taskList, Task{name, unionMap})
+			goto Output
+		} else {
+			parseValue = mps[0]
+			tp = reflect.TypeOf(parseValue)
 		}
 
+	}
+
+	// 输出类型
+	switch tp.Kind() {
+	case reflect.Bool:
+		typeStr += "bool"
+	case reflect.String:
+		typeStr += "string"
+	case reflect.Int:
+		typeStr += "int"
+	case reflect.Float32:
+		typeStr += "float32"
+	case reflect.Float64:
+		typeStr += "float64"
+	case reflect.Struct: // 支持null值
+		typeStr += "interface{}"
 	case reflect.Map:
-		typeStr = key + "Item"
-		mp, ok := task.content[oldKey].(map[string]interface{})
+		typeStr += key + "Item"
+		mp, ok := parseValue.(map[string]interface{})
 		if !ok {
 			return "", fmt.Errorf("wrong value type : %s ", val)
 		}
@@ -210,6 +236,8 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 	default:
 		return "", fmt.Errorf("wrong value type : %s ", val)
 	}
+
+Output:
 	lineBuffer.WriteString(typeStr + "\t")
 
 	// write tag
@@ -217,7 +245,6 @@ func getStructLineString(key string, val interface{}, task Task) (line string, e
 	lineBuffer.WriteString(tagStr)
 
 	return lineBuffer.String(), nil
-
 }
 
 func getUnionFieldMap(mps []interface{}) (unionMap map[string]interface{}) {
