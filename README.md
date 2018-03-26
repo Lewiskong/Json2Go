@@ -10,13 +10,7 @@ Assuming that `GOPATH/bin` is in your `PATH` , you can now use `Json2Go` directl
 ## **Usage**
 ```
 usage:
-    Json2Go [file]
-    Json2Go [file] [target]
-    Json2Go:
-        -src	:	source file
-        -dest	:	dest file
-        -f		:	overwrite dest file. Default true
-        -name	:	The name of the go struct
+    Json2Go [-r] '${JsonStr}'
 ```
 
 ## **Example**
